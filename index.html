@@ -2471,12 +2471,15 @@ window._sp5pReady = Promise.all([
     background: akademikInfoForSelected.status === 'L' ? '#fef2f2' : '#eff6ff',
     border: '1px solid ' + (akademikInfoForSelected.status === 'L' ? '#fecaca' : '#bfdbfe')
   }">
-  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px"
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px"
     :style="{ color: akademikInfoForSelected.status === 'L' ? '#dc2626' : '#2563eb' }">
     <i class="fas fa-calendar-day" style="margin-right:6px"></i>
     {{ akademikInfoForSelected.status === 'L' ? 'Libur' : 'Tidak Libur' }}
   </div>
-  <div style="font-size:14px;color:#1f2937;line-height:1.6">{{ akademikInfoForSelected.deskripsi }}</div>
+  <div v-for="(it, idx) in akademikInfoForSelected.items" :key="idx"
+    style="font-size:14px;color:#1f2937;line-height:1.6">
+    • {{ it.deskripsi }}
+  </div>
 </div>
           <div v-if="selectedAgendaItems.length > 1" class="agenda-modal-nav">
             <button class="agenda-nav-btn" @click="agendaPrev" :disabled="selectedAgendaIndex === 0" title="Sebelumnya">
@@ -3223,13 +3226,28 @@ const todayLabel = computed(() => {
 const AKADEMIK_START_MONTH = 7;    // Juli
 const AKADEMIK_START_YEAR  = 2026; // sesuai tahun kalender Semester Ganjil
 
+const AGENDA_SEP_SAMEDAY = '🐸'; // pemisah beberapa event dalam TANGGAL YANG SAMA
+
 const parseAkademikKalender = (raw) => {
   if (!raw || !raw.trim()) return [];
+  // Level 1: split by 🫏 → tiap hasil = 1 HARI (positional, mulai 1 Juli)
   return raw.split(AGENDA_SEP_ENTRY).map(entry => {
-    const f = entry.trim().split(AGENDA_SEP_FIELD);
+    // Level 2: split by 🐸 → tiap hasil = 1 EVENT dalam hari yang sama
+    const subItems = entry.trim().split(AGENDA_SEP_SAMEDAY)
+      .map(s => s.trim())
+      .filter(s => s);
+
+    const parsedSub = subItems.map(sub => {
+      const f = sub.split(AGENDA_SEP_FIELD);
+      return {
+        deskripsi: (f[0] || '').trim(),
+        status:    (f[1] || '').trim().toUpperCase(),
+      };
+    });
+
     return {
-      deskripsi: (f[0] || '').trim(),
-      status:    (f[1] || '').trim().toUpperCase(), // 'L' atau 'TL'
+      items:  parsedSub,                                   // semua event di hari itu
+      status: parsedSub.length ? parsedSub[0].status : '',  // status diambil dari EVENT PERTAMA saja
     };
   });
 };
@@ -3251,14 +3269,15 @@ const akademikByDate = computed(() => {
   if (!entries.length) return map;
 
   const curDate = new Date(AKADEMIK_START_YEAR, AKADEMIK_START_MONTH - 1, 1); // 1 Juli
-  entries.forEach(item => {
-    if (item.deskripsi && item.deskripsi !== '-') {
-      const key = curDate.getDate() + '/' + (curDate.getMonth() + 1);
-      map[key] = item;
-    }
-    curDate.setDate(curDate.getDate() + 1);
-  });
-  return map;
+entries.forEach(item => {
+  const hasContent = item.items.some(it => it.deskripsi && it.deskripsi !== '-');
+  if (hasContent) {
+    const key = curDate.getDate() + '/' + (curDate.getMonth() + 1);
+    map[key] = item; // { items: [...], status: status dari event pertama }
+  }
+  curDate.setDate(curDate.getDate() + 1);
+});
+return map;
 });
 
 const getAkademikStatus = (day, monthNum) => {
