@@ -2131,7 +2131,7 @@ window._sp5pReady = Promise.all([
           <div class="page-header">
             <div>
               <div class="ph-title">Agenda</div>
-              <div class="ph-sub">Kalender Semester {{ selectedSemester === 'GANJIL' ? 'Ganjil (Juli - Desember 2026)' : 'Genap (Januari - Juni 2027)' }}</div>
+              <div class="ph-sub">Kalender Semester {{ agendaYearLabel }}</div>
             </div>
             <div class="ph-icon" style="background:#ecfeff;color:#0891b2">
               <i class="fas fa-calendar-alt"></i>
@@ -3180,20 +3180,46 @@ const todayLabel = computed(() => {
       return weeks;
     };
 
-    const agendaCalendars = computed(() => {
-      const isGanjil = selectedSemester.value === 'GANJIL';
-      // Ganjil: Juli - Desember 2026 (bulan index 6-11)
-      // Genap : Januari - Juni 2027 (bulan index 0-5)
-      const year        = isGanjil ? 2026 : 2027;
-      const monthsRange = isGanjil ? [6,7,8,9,10,11] : [0,1,2,3,4,5];
 
-      return monthsRange.map(m => ({
-        label: BULAN_ID[m],
-        year,
-        monthNum: m + 1,
-        weeks: buildMonthCalendar(year, m)
-      }));
-    });
+    const agendaCalendars = computed(() => {
+  const isGanjil = selectedSemester.value === 'GANJIL';
+  const monthsRange = isGanjil ? [6,7,8,9,10,11] : [0,1,2,3,4,5];
+
+  // Ambil tahun dari index TERAKHIR baris kelas di kalenderganjil.js / kalendergenap.js
+  const raw   = window.KALENDER_DATA;
+  const kelas = (studentData.value.kelas || '').trim();
+  let year = isGanjil ? 2026 : 2027; // fallback kalau data belum termuat / kelas tidak ketemu
+  if (raw && kelas) {
+    const row = raw.find(r => (r[0] || '').trim() === kelas);
+    if (row && row.length > 0) {
+      const parsedYear = parseInt(row[row.length - 1], 10);
+      if (!isNaN(parsedYear)) year = parsedYear;
+    }
+  }
+
+  return monthsRange.map(m => ({
+    label: BULAN_ID[m],
+    year,
+    monthNum: m + 1,
+    weeks: buildMonthCalendar(year, m)
+  }));
+});
+
+const agendaYearLabel = computed(() => {
+  const cals = agendaCalendars.value;
+  if (!cals.length) return '';
+  const year = cals[0].year;
+  return selectedSemester.value === 'GANJIL'
+    ? `Ganjil (Juli - Desember ${year})`
+    : `Genap (Januari - Juni ${year})`;
+});
+
+
+
+
+
+
+
 
     // ── PARSER AGENDA (kalender.js) ──
     const AGENDA_SEP_ENTRY = '🫏';
@@ -3262,13 +3288,17 @@ const akademikByDate = computed(() => {
   if (!raw || !kelas) return map;
 
   const row = raw.find(r => (r[0] || '').trim() === kelas);
-  if (!row || row.length < 2) return map;
+if (!row || row.length < 2) return map;
 
-  const lastCell = row[row.length - 1];
-  const entries  = parseAkademikKalender(lastCell);
-  if (!entries.length) return map;
+// Index TERAKHIR baris = tahun kalender (mis. 2026)
+// Index SEBELUM terakhir = string data kalender akademik
+const yearFromRow = parseInt(row[row.length - 1], 10);
+const startYear    = !isNaN(yearFromRow) ? yearFromRow : AKADEMIK_START_YEAR;
+const lastCell      = row[row.length - 2];
+const entries  = parseAkademikKalender(lastCell);
+if (!entries.length) return map;
 
-  const curDate = new Date(AKADEMIK_START_YEAR, AKADEMIK_START_MONTH - 1, 1); // 1 Juli
+const curDate = new Date(startYear, AKADEMIK_START_MONTH - 1, 1); // 1 Juli
 entries.forEach(item => {
   const hasContent = item.items.some(it => it.deskripsi && it.deskripsi !== '-');
   if (hasContent) {
