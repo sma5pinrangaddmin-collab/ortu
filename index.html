@@ -51,7 +51,6 @@ const _sp5p_loadData = async () => {
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const js = await res.text();
-
     const marker = 'window.__SP5P="';
     const idx    = js.indexOf(marker);
 
@@ -131,10 +130,11 @@ const _sp5p_loadConfig = async () => {
   } catch(e) { window.GITHUB_CONFIG = {}; }
 };
 
-// ── Fetch kalender.js (no-cache) → window.KALENDER_DATA ──
-const _sp5p_loadKalender = async () => {
+// ── Fetch kalenderganjil.js / kalendergenap.js (no-cache) → window.KALENDER_DATA ──
+const _sp5p_loadKalender = async (semester) => {
   try {
-    const res = await fetch("kalender.js?v=" + Date.now(), {
+    const fileName = (semester === 'GENAP') ? 'kalendergenap.js' : 'kalenderganjil.js';
+    const res = await fetch(fileName + "?v=" + Date.now(), {
       cache:   "no-store",
       headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
     });
@@ -146,9 +146,21 @@ const _sp5p_loadKalender = async () => {
     window.KALENDER_DATA = null;
   }
 };
+// Expose ke window agar bisa dipanggil ulang dari dalam Vue app (login/reset)
+window._sp5p_loadData     = _sp5p_loadData;
+window._sp5p_loadConfig   = _sp5p_loadConfig;
+window._sp5p_loadKalender = _sp5p_loadKalender;
 
-// Mulai load datasiswa.js + config.js + kalender.js secara paralel
-window._sp5pReady = Promise.all([_sp5p_loadData(), _sp5p_loadConfig(), _sp5p_loadKalender()]);
+// Tentukan semester default (sama logikanya dengan yang dipakai di Vue setup)
+const _sp5p_defaultSemesterMonth = new Date().getMonth() + 1;
+const _sp5p_defaultSemester = (_sp5p_defaultSemesterMonth >= 1 && _sp5p_defaultSemesterMonth <= 6) ? 'GENAP' : 'GANJIL';
+
+// Mulai load datasiswa.js + config.js + kalenderganjil/genap.js secara paralel
+window._sp5pReady = Promise.all([
+  _sp5p_loadData(),
+  _sp5p_loadConfig(),
+  _sp5p_loadKalender(_sp5p_defaultSemester)
+]);
 </script>
 <style>
   :root {
@@ -2659,7 +2671,10 @@ _idbGet(BG_IDB_KEY).then(cached => {
     const defaultSemester = (currentMonth >= 1 && currentMonth <= 6) ? 'GENAP' : 'GANJIL';
     const selectedSemester  = ref(defaultSemester);
     const showGenapOption   = computed(() => currentMonth >= 1 && currentMonth <= 6);
-
+// Muat ulang kalenderganjil.js / kalendergenap.js setiap kali semester berubah
+watch(selectedSemester, async (newSem) => {
+  await window._sp5p_loadKalender(newSem);
+});
     const STORE_KEY = 'sp5p_session';
 
     const showDownloadConfirm = ref(false);
@@ -2812,7 +2827,11 @@ _idbGet(BG_IDB_KEY).then(cached => {
         // Hapus data sensitif & reload data + config baru dari server
         try { delete window.SISWA_DATA;    } catch(e) { window.SISWA_DATA    = null; }
         try { delete window.GITHUB_CONFIG; } catch(e) { window.GITHUB_CONFIG = {};   }
-        window._sp5pReady = Promise.all([window._sp5p_loadData(), window._sp5p_loadConfig(), window._sp5p_loadKalender ? window._sp5p_loadKalender() : Promise.resolve()]);
+        window._sp5pReady = Promise.all([
+  window._sp5p_loadData(),
+  window._sp5p_loadConfig(),
+  window._sp5p_loadKalender ? window._sp5p_loadKalender(selectedSemester.value) : Promise.resolve()
+]);
 
       } catch (e) {
         window.location.reload();
@@ -3070,6 +3089,8 @@ _idbGet(BG_IDB_KEY).then(cached => {
         const db = window.SISWA_DATA;
         const semester     = selectedSemester.value || 'GANJIL';
         const semesterData = db[semester];
+        // Pastikan data kalender yang termuat sesuai semester yang dipilih saat login
+await window._sp5p_loadKalender(semester);
         if (!semesterData) throw new Error('Data semester ' + semester + ' tidak ditemukan.');
 
         const nisnStr = nisnInput.value.toString().trim();
