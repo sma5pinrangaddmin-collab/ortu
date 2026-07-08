@@ -2483,13 +2483,19 @@ window._sp5pReady = Promise.all([_sp5p_loadData(), _sp5p_loadConfig(), _sp5p_loa
             </div>
 
             <div class="agenda-detail-row">
-              <div class="agenda-detail-label"><i class="fas fa-book-open"></i> Materi</div>
-              <div class="agenda-detail-value" :class="{ 'is-empty': !currentAgendaItem.materi }">
-                {{ currentAgendaItem.materi || '-' }}
-              </div>
-            </div>
-            <div class="agenda-detail-row">
-              <div class="agenda-detail-label"><i class="fas fa-tasks"></i> Tugas</div>
+  <div class="agenda-detail-label"><i class="fas fa-book-open"></i> Materi</div>
+  <div class="agenda-detail-value" :class="{ 'is-empty': !currentAgendaItem.materi }">
+    {{ currentAgendaItem.materi || '-' }}
+  </div>
+</div>
+<div class="agenda-detail-row">
+  <div class="agenda-detail-label"><i class="fas fa-bullseye"></i> Tujuan</div>
+  <div class="agenda-detail-value" :class="{ 'is-empty': !currentAgendaItem.tujuan }">
+    {{ currentAgendaItem.tujuan || '-' }}
+  </div>
+</div>
+<div class="agenda-detail-row">
+  <div class="agenda-detail-label"><i class="fas fa-tasks"></i> Tugas</div>
               <div class="agenda-detail-value" :class="{ 'is-empty': !currentAgendaItem.tugas }">
                 {{ currentAgendaItem.tugas || '-' }}
               </div>
@@ -3165,18 +3171,19 @@ const todayLabel = computed(() => {
     };
 
     const parseAgendaCell = (raw) => {
-      if (!raw || !raw.trim()) return [];
-      return raw.split(AGENDA_SEP_ENTRY).filter(s => s.trim()).map(entry => {
-        const f = splitLimit(entry.trim(), AGENDA_SEP_FIELD, 5);
-        return {
-          mapel:   (f[0] || '-').trim(),
-          tanggal: (f[1] || '').trim(),
-          materi:  (f[2] || '').trim(),
-          tugas:   (f[3] || '').trim(),
-          catatan: (f[4] || '').trim(),
-        };
-      });
+  if (!raw || !raw.trim()) return [];
+  return raw.split(AGENDA_SEP_ENTRY).filter(s => s.trim()).map(entry => {
+    const f = splitLimit(entry.trim(), AGENDA_SEP_FIELD, 6);
+    return {
+      mapel:   (f[0] || '-').trim(),
+      tanggal: (f[1] || '').trim(),
+      materi:  (f[2] || '').trim(),
+      tujuan:  (f[3] || '').trim(),
+      tugas:   (f[4] || '').trim(),
+      catatan: (f[5] || '').trim(),
     };
+  });
+};
 
     // { "10/7": [ {mapel, tanggal, materi, tugas, catatan}, ... ] }
     const agendaByDate = computed(() => {
