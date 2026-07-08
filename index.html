@@ -2134,13 +2134,15 @@ window._sp5pReady = Promise.all([_sp5p_loadData(), _sp5p_loadConfig(), _sp5p_loa
               </div>
               <div class="agenda-week" v-for="(week, wi) in cal.weeks" :key="wi">
                 <span v-for="(cell, ci) in week" :key="ci"
-                  class="agenda-day"
-                  :class="{
-                    'agenda-day-empty': !cell.day,
-                    'agenda-day-sunday': cell.isSunday && cell.day,
-                    'agenda-day-has-event': cell.day && hasAgenda(cell.day, cal.monthNum)
-                  }"
-                  @click="cell.day && openAgendaDetail(cell.day, cal.monthNum, cal.year)">
+  class="agenda-day"
+  :class="{
+    'agenda-day-empty': !cell.day,
+    'agenda-day-sunday': cell.isSunday && cell.day,
+    'agenda-day-has-event': cell.day && hasAgenda(cell.day, cal.monthNum),
+    'agenda-day-libur': cell.day && getAkademikStatus(cell.day, cal.monthNum) === 'L',
+    'agenda-day-tidaklibur': cell.day && getAkademikStatus(cell.day, cal.monthNum) === 'TL'
+  }"
+  @click="cell.day && openAgendaDetail(cell.day, cal.monthNum, cal.year)">
                   <span>{{ cell.day || '•' }}</span>
                   <span v-if="cell.day && hasAgenda(cell.day, cal.monthNum)" class="agenda-dots">
                     <span v-for="n in Math.min(getAgendaCount(cell.day, cal.monthNum), 4)" :key="n" class="agenda-dot"></span>
@@ -2452,7 +2454,18 @@ window._sp5pReady = Promise.all([_sp5p_loadData(), _sp5p_loadConfig(), _sp5p_loa
             </div>
             <button class="modal-close" @click="closeAgendaModal"><i class="fas fa-times"></i></button>
           </div>
-
+<div v-if="akademikInfoForSelected" style="margin: 0 0 16px; padding: 14px 16px; border-radius: 14px;"
+  :style="{
+    background: akademikInfoForSelected.status === 'L' ? '#fef2f2' : '#eff6ff',
+    border: '1px solid ' + (akademikInfoForSelected.status === 'L' ? '#fecaca' : '#bfdbfe')
+  }">
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px"
+    :style="{ color: akademikInfoForSelected.status === 'L' ? '#dc2626' : '#2563eb' }">
+    <i class="fas fa-calendar-day" style="margin-right:6px"></i>
+    {{ akademikInfoForSelected.status === 'L' ? 'Libur' : 'Tidak Libur' }}
+  </div>
+  <div style="font-size:14px;color:#1f2937;line-height:1.6">{{ akademikInfoForSelected.deskripsi }}</div>
+</div>
           <div v-if="selectedAgendaItems.length > 1" class="agenda-modal-nav">
             <button class="agenda-nav-btn" @click="agendaPrev" :disabled="selectedAgendaIndex === 0" title="Sebelumnya">
               <i class="fas fa-chevron-left"></i>
@@ -3184,6 +3197,57 @@ const todayLabel = computed(() => {
     };
   });
 };
+// ── PARSER KALENDER AKADEMIK (kolom terakhir) ──
+// Format: "Deskripsi☯️STATUS🫏Deskripsi☯️STATUS🫏..." berurutan mulai 1 Juli s/d 31 Desember
+const AKADEMIK_START_MONTH = 7;    // Juli
+const AKADEMIK_START_YEAR  = 2026; // sesuai tahun kalender Semester Ganjil
+
+const parseAkademikKalender = (raw) => {
+  if (!raw || !raw.trim()) return [];
+  return raw.split(AGENDA_SEP_ENTRY).map(entry => {
+    const f = entry.trim().split(AGENDA_SEP_FIELD);
+    return {
+      deskripsi: (f[0] || '').trim(),
+      status:    (f[1] || '').trim().toUpperCase(), // 'L' atau 'TL'
+    };
+  });
+};
+
+// { "8/7": { deskripsi, status } }
+const akademikByDate = computed(() => {
+  const map   = {};
+  if (selectedSemester.value !== 'GANJIL') return map; // data ini cakupannya Juli-Desember
+
+  const raw   = window.KALENDER_DATA;
+  const kelas = (studentData.value.kelas || '').trim();
+  if (!raw || !kelas) return map;
+
+  const row = raw.find(r => (r[0] || '').trim() === kelas);
+  if (!row || row.length < 2) return map;
+
+  const lastCell = row[row.length - 1];
+  const entries  = parseAkademikKalender(lastCell);
+  if (!entries.length) return map;
+
+  const curDate = new Date(AKADEMIK_START_YEAR, AKADEMIK_START_MONTH - 1, 1); // 1 Juli
+  entries.forEach(item => {
+    if (item.deskripsi && item.deskripsi !== '-') {
+      const key = curDate.getDate() + '/' + (curDate.getMonth() + 1);
+      map[key] = item;
+    }
+    curDate.setDate(curDate.getDate() + 1);
+  });
+  return map;
+});
+
+const getAkademikStatus = (day, monthNum) => {
+  const item = akademikByDate.value[day + '/' + monthNum];
+  return item ? item.status : null;
+};
+
+const akademikInfoForSelected = computed(() => {
+  return akademikByDate.value[selectedAgendaKey.value] || null;
+});
 
     // { "10/7": [ {mapel, tanggal, materi, tugas, catatan}, ... ] }
     const agendaByDate = computed(() => {
@@ -3195,15 +3259,15 @@ const todayLabel = computed(() => {
       const row = raw.find(r => (r[0] || '').trim() === kelas);
       if (!row) return map;
 
-      for (let i = 1; i < row.length; i++) {
-        const cell = row[i];
-        if (!cell) continue;
-        parseAgendaCell(cell).forEach(item => {
-          if (!item.tanggal) return;
-          if (!map[item.tanggal]) map[item.tanggal] = [];
-          map[item.tanggal].push(item);
-        });
-      }
+      for (let i = 1; i < row.length - 1; i++) {
+  const cell = row[i];
+  if (!cell) continue;
+  parseAgendaCell(cell).forEach(item => {
+    if (!item.tanggal) return;
+    if (!map[item.tanggal]) map[item.tanggal] = [];
+    map[item.tanggal].push(item);
+  });
+}
       return map;
     });
 
@@ -3579,12 +3643,16 @@ const visibleNotes = computed(() => {
       weekdayLabels, agendaCalendars,
       agendaByDate, hasAgenda, getAgendaCount,
       showAgendaModal, selectedAgendaLabel, selectedAgendaItems, selectedAgendaIndex, currentAgendaItem,
-      openAgendaDetail, closeAgendaModal, agendaPrev, agendaNext,
+      openAgendaDetail, closeAgendaModal, agendaPrev, agendaNext,akademikByDate, getAkademikStatus, akademikInfoForSelected,
     };
   }
 }).mount('#app');
 </script>
 <style>
+
+  .agenda-day-libur      { color: #dc2626 !important; font-weight: 800; }
+.agenda-day-tidaklibur { color: #2563eb !important; font-weight: 800; }
+
 .bg-green  { background:#ecfdf5!important; color:#059669!important; border-radius:8px; }
 .bg-purple { background:#f5f3ff!important; color:#7c3aed!important; border-radius:8px; }
 .bg-blue   { background:#eff6ff!important; color:#2563eb!important; border-radius:8px; }
