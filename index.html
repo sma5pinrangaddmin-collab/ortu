@@ -108,21 +108,6 @@ const _sp5p_loadData = async () => {
   document.addEventListener("contextmenu", e => e.preventDefault());
 })();
 
-const _sp5p_loadKalender = async () => {
-  try {
-    const res = await fetch("kalender.js?v=" + Date.now(), {
-      cache:   "no-store",
-      headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
-    });
-    if (!res.ok) return;
-    const js = await res.text();
-    const fn = new Function(js + "; return (typeof kalender !== 'undefined') ? kalender : null;");
-    window.KALENDER_DATA = fn();
-  } catch (e) {
-    window.KALENDER_DATA = null;
-  }
-};
-
 // ── Fetch + decrypt config.js (no-cache, tidak terlihat di F12 Sources) ──
 const _sp5p_loadConfig = async () => {
   try {
@@ -146,7 +131,23 @@ const _sp5p_loadConfig = async () => {
   } catch(e) { window.GITHUB_CONFIG = {}; }
 };
 
-// Mulai load datasiswa.js + config.js secara paralel
+// ── Fetch kalender.js (no-cache) → window.KALENDER_DATA ──
+const _sp5p_loadKalender = async () => {
+  try {
+    const res = await fetch("kalender.js?v=" + Date.now(), {
+      cache:   "no-store",
+      headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
+    });
+    if (!res.ok) { window.KALENDER_DATA = null; return; }
+    const js = await res.text();
+    const fn = new Function(js + "; return (typeof kalender !== 'undefined') ? kalender : null;");
+    window.KALENDER_DATA = fn();
+  } catch(e) {
+    window.KALENDER_DATA = null;
+  }
+};
+
+// Mulai load datasiswa.js + config.js + kalender.js secara paralel
 window._sp5pReady = Promise.all([_sp5p_loadData(), _sp5p_loadConfig(), _sp5p_loadKalender()]);
 </script>
 <style>
@@ -1036,23 +1037,35 @@ window._sp5pReady = Promise.all([_sp5p_loadData(), _sp5p_loadConfig(), _sp5p_loa
   .agenda-day {
     text-align: center; font-size: 13px; font-weight: 600;
     color: #1f2937; padding: 7px 0; border-radius: 8px;
+    position: relative; cursor: default;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    min-height: 40px;
+    transition: all 0.2s;
   }
   .agenda-day-empty { color: transparent; }
   .agenda-day-sunday { color: #dc2626; font-weight: 800; }
-.agenda-day { cursor: default; position: relative; }
-.agenda-day-has-event {
-  cursor: pointer;
-  background: #ecfeff;
-  color: #0e7490;
-  font-weight: 800;
-}
-.agenda-day-has-event:hover { background: #cffafe; }
-.agenda-dot {
-  display: block;
-  width: 5px; height: 5px; border-radius: 50%;
-  background: #0891b2;
-  margin: 2px auto 0;
-}
+  .agenda-day-has-event {
+    cursor: pointer;
+    background: #ecfeff;
+    color: #0e7490;
+    font-weight: 800;
+  }
+  .agenda-day-has-event:hover {
+    background: #cffafe;
+    transform: translateY(-1px);
+  }
+  .agenda-day-sunday.agenda-day-has-event { color: #be123c; background: #fff1f2; }
+  .agenda-day-sunday.agenda-day-has-event:hover { background: #ffe4e6; }
+  .agenda-dots {
+    display: flex; align-items: center; justify-content: center;
+    gap: 2px; margin-top: 2px; flex-wrap: wrap; max-width: 28px;
+  }
+  .agenda-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: #0891b2; flex-shrink: 0;
+  }
+  .agenda-day-sunday .agenda-dot { background: #e11d48; }
+
   /* ─── MODAL ─── */
   .modal-overlay {
     position: fixed; inset: 0; z-index: 1000;
@@ -1115,6 +1128,57 @@ window._sp5pReady = Promise.all([_sp5p_loadData(), _sp5p_loadConfig(), _sp5p_loa
     padding: 4px 12px; border-radius: 8px;
     font-size: 12px; font-weight: 700;
   }
+
+  /* ─── AGENDA MODAL (carousel) ─── */
+  .agenda-modal-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 18px;
+  }
+  .agenda-nav-btn {
+    width: 38px; height: 38px; border-radius: 12px;
+    border: 1px solid #e5e7eb; background: #f9fafb;
+    color: #374151; font-size: 15px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.2s;
+  }
+  .agenda-nav-btn:hover:not(:disabled) {
+    background: #0891b2; border-color: #0891b2; color: white;
+    transform: scale(1.06);
+  }
+  .agenda-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .agenda-nav-counter {
+    font-size: 12px; font-weight: 700; color: #6b7280;
+    background: #f3f4f6; padding: 6px 14px; border-radius: 20px;
+    letter-spacing: 0.5px; white-space: nowrap;
+  }
+  .agenda-item-card {
+    animation: fadeSlideUp 0.25s ease;
+  }
+  .agenda-item-header {
+    display: flex; align-items: center; gap: 12px;
+    background: linear-gradient(135deg, #0e7490, #0891b2);
+    border-radius: 16px; padding: 16px;
+    margin-bottom: 16px; color: white;
+  }
+  .agenda-item-icon {
+    width: 42px; height: 42px; border-radius: 12px;
+    background: rgba(255,255,255,0.18);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .agenda-item-mapel { font-weight: 700; font-size: 15px; line-height: 1.3; }
+  .agenda-item-tanggal { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+  .agenda-detail-row {
+    background: #f9fafb; border-radius: 12px; padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .agenda-detail-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: #9ca3af; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .agenda-detail-value { font-size: 14px; color: #1f2937; line-height: 1.6; }
+  .agenda-detail-value.is-empty { color: #d1d5db; font-style: italic; }
 
   /* ─── SERVER PANEL ─── */
   .server-panel { padding: 4px 0; }
@@ -2070,16 +2134,18 @@ window._sp5pReady = Promise.all([_sp5p_loadData(), _sp5p_loadConfig(), _sp5p_loa
               </div>
               <div class="agenda-week" v-for="(week, wi) in cal.weeks" :key="wi">
                 <span v-for="(cell, ci) in week" :key="ci"
-  class="agenda-day"
-  :class="{
-    'agenda-day-empty': !cell.day,
-    'agenda-day-sunday': cell.isSunday && cell.day,
-    'agenda-day-has-event': cell.day && hasAgenda(cell.day, cal.monthNum)
-  }"
-  @click="cell.day && openAgendaDetail(cell.day, cal.monthNum, cal.year)">
-  {{ cell.day || '•' }}
-  <span v-if="cell.day && hasAgenda(cell.day, cal.monthNum)" class="agenda-dot"></span>
-</span>
+                  class="agenda-day"
+                  :class="{
+                    'agenda-day-empty': !cell.day,
+                    'agenda-day-sunday': cell.isSunday && cell.day,
+                    'agenda-day-has-event': cell.day && hasAgenda(cell.day, cal.monthNum)
+                  }"
+                  @click="cell.day && openAgendaDetail(cell.day, cal.monthNum, cal.year)">
+                  <span>{{ cell.day || '•' }}</span>
+                  <span v-if="cell.day && hasAgenda(cell.day, cal.monthNum)" class="agenda-dots">
+                    <span v-for="n in Math.min(getAgendaCount(cell.day, cal.monthNum), 4)" :key="n" class="agenda-dot"></span>
+                  </span>
+                </span>
               </div>
             </div>
           </div>
@@ -2319,9 +2385,6 @@ window._sp5pReady = Promise.all([_sp5p_loadData(), _sp5p_loadConfig(), _sp5p_loa
       </div>
     </div>
 
-
-
-
     <!-- ASSESSMENT MODAL -->
     <div v-if="showAssessmentModal && selectedAssessment" class="modal-overlay" @click.self="closeModal">
       <div class="modal-box">
@@ -2377,40 +2440,71 @@ window._sp5pReady = Promise.all([_sp5p_loadData(), _sp5p_loadConfig(), _sp5p_loa
         </div>
       </div>
     </div>
-<div v-if="showAgendaModal" class="modal-overlay" @click.self="closeAgendaModal">
-  <div class="modal-box">
-    <div class="modal-static">
-      <div class="modal-header">
-        <div>
-          <div class="modal-title">Agenda</div>
-          <div class="modal-sub">{{ selectedAgendaLabel }}</div>
+
+    <!-- AGENDA MODAL -->
+    <div v-if="showAgendaModal" class="modal-overlay" @click.self="closeAgendaModal">
+      <div class="modal-box">
+        <div class="modal-static">
+          <div class="modal-header">
+            <div>
+              <div class="modal-title">Agenda</div>
+              <div class="modal-sub">{{ selectedAgendaLabel }}</div>
+            </div>
+            <button class="modal-close" @click="closeAgendaModal"><i class="fas fa-times"></i></button>
+          </div>
+
+          <div v-if="selectedAgendaItems.length > 1" class="agenda-modal-nav">
+            <button class="agenda-nav-btn" @click="agendaPrev" :disabled="selectedAgendaIndex === 0" title="Sebelumnya">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <div class="agenda-nav-counter">
+              <i class="fas fa-layer-group" style="margin-right:5px"></i>
+              {{ selectedAgendaIndex + 1 }} / {{ selectedAgendaItems.length }} Mapel
+            </div>
+            <button class="agenda-nav-btn" @click="agendaNext" :disabled="selectedAgendaIndex === selectedAgendaItems.length - 1" title="Selanjutnya">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
         </div>
-        <button class="modal-close" @click="closeAgendaModal"><i class="fas fa-times"></i></button>
+
+        <div class="modal-scroll">
+          <div v-if="selectedAgendaItems.length === 0" style="text-align:center;color:#9ca3af;padding:24px">
+            <i class="fas fa-calendar-day" style="font-size:24px;margin-bottom:8px;opacity:0.3;display:block"></i>
+            Tidak ada agenda pada tanggal ini
+          </div>
+
+          <div v-else-if="currentAgendaItem" class="agenda-item-card" :key="selectedAgendaIndex">
+            <div class="agenda-item-header">
+              <div class="agenda-item-icon"><i class="fas fa-book"></i></div>
+              <div>
+                <div class="agenda-item-mapel">{{ currentAgendaItem.mapel }}</div>
+                <div class="agenda-item-tanggal"><i class="fas fa-calendar-alt" style="margin-right:5px"></i>{{ selectedAgendaLabel }}</div>
+              </div>
+            </div>
+
+            <div class="agenda-detail-row">
+              <div class="agenda-detail-label"><i class="fas fa-book-open"></i> Materi</div>
+              <div class="agenda-detail-value" :class="{ 'is-empty': !currentAgendaItem.materi }">
+                {{ currentAgendaItem.materi || '-' }}
+              </div>
+            </div>
+            <div class="agenda-detail-row">
+              <div class="agenda-detail-label"><i class="fas fa-tasks"></i> Tugas</div>
+              <div class="agenda-detail-value" :class="{ 'is-empty': !currentAgendaItem.tugas }">
+                {{ currentAgendaItem.tugas || '-' }}
+              </div>
+            </div>
+            <div class="agenda-detail-row">
+              <div class="agenda-detail-label"><i class="fas fa-sticky-note"></i> Catatan</div>
+              <div class="agenda-detail-value" :class="{ 'is-empty': !currentAgendaItem.catatan }">
+                {{ currentAgendaItem.catatan || '-' }}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="modal-scroll">
-      <div v-if="selectedAgendaItems.length === 0" style="text-align:center;color:#9ca3af;padding:24px">
-        <i class="fas fa-calendar-day" style="font-size:24px;margin-bottom:8px;opacity:0.3;display:block"></i>
-        Tidak ada agenda pada tanggal ini
-      </div>
-      <div v-for="(item, i) in selectedAgendaItems" :key="i"
-        style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f3f4f6">
-        <div style="font-weight:700;font-size:14px;color:#0e7490;margin-bottom:8px">
-          <i class="fas fa-book" style="margin-right:6px"></i>{{ item.mapel }}
-        </div>
-        <div v-if="item.materi" style="font-size:13px;color:#374151;margin-bottom:6px">
-          <strong>Materi:</strong> {{ item.materi }}
-        </div>
-        <div v-if="item.tugas" style="font-size:13px;color:#374151;margin-bottom:6px">
-          <strong>Tugas:</strong> {{ item.tugas }}
-        </div>
-        <div v-if="item.catatan" style="font-size:13px;color:#374151">
-          <strong>Catatan:</strong> {{ item.catatan }}
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+
   </div>
 
 </div>
@@ -2699,7 +2793,7 @@ _idbGet(BG_IDB_KEY).then(cached => {
         // Hapus data sensitif & reload data + config baru dari server
         try { delete window.SISWA_DATA;    } catch(e) { window.SISWA_DATA    = null; }
         try { delete window.GITHUB_CONFIG; } catch(e) { window.GITHUB_CONFIG = {};   }
-        window._sp5pReady = Promise.all([window._sp5p_loadData(), window._sp5p_loadConfig()]);
+        window._sp5pReady = Promise.all([window._sp5p_loadData(), window._sp5p_loadConfig(), window._sp5p_loadKalender ? window._sp5p_loadKalender() : Promise.resolve()]);
 
       } catch (e) {
         window.location.reload();
@@ -3043,88 +3137,104 @@ const todayLabel = computed(() => {
       return weeks;
     };
 
-// ── PARSER AGENDA / KALENDER ──
-const AGENDA_SEP_ENTRY = '🫏';
-const AGENDA_SEP_FIELD = '☯️';
-
-const splitLimit = (str, sep, limit) => {
-  const parts = str.split(sep);
-  if (parts.length <= limit) return parts;
-  const head = parts.slice(0, limit - 1);
-  const tail = parts.slice(limit - 1).join(sep);
-  return [...head, tail];
-};
-
-const parseAgendaCell = (raw) => {
-  if (!raw || !raw.trim()) return [];
-  return raw.split(AGENDA_SEP_ENTRY).filter(s => s.trim()).map(entry => {
-    const [mapel, tanggal, materi, tugas, catatan] = splitLimit(entry, AGENDA_SEP_FIELD, 5);
-    return {
-      mapel:   (mapel   || '-').trim(),
-      tanggal: (tanggal || '').trim(),
-      materi:  (materi  || '').trim(),
-      tugas:   (tugas   || '').trim(),
-      catatan: (catatan || '').trim(),
-    };
-  });
-};
-
-// { "7/7": [ {mapel, materi, tugas, catatan}, ... ], "8/7": [...] }
-const agendaByDate = computed(() => {
-  const map   = {};
-  const raw   = window.KALENDER_DATA;
-  const kelas = (studentData.value.kelas || '').trim();
-  if (!raw || !kelas) return map;
-
-  const row = raw.find(r => (r[0] || '').trim() === kelas);
-  if (!row) return map;
-
-  for (let i = 1; i < row.length; i++) {
-    const cell = row[i];
-    if (!cell) continue;
-    parseAgendaCell(cell).forEach(item => {
-      if (!item.tanggal) return;
-      if (!map[item.tanggal]) map[item.tanggal] = [];
-      map[item.tanggal].push(item);
-    });
-  }
-  return map;
-});
-
-const hasAgenda = (day, monthNum) => {
-  const key = day + '/' + monthNum;
-  return !!(agendaByDate.value[key] && agendaByDate.value[key].length);
-};
-
-const showAgendaModal    = ref(false);
-const selectedAgendaKey  = ref('');
-const selectedAgendaLabel = ref('');
-const selectedAgendaItems = computed(() => agendaByDate.value[selectedAgendaKey.value] || []);
-
-const openAgendaDetail = (day, monthNum, year) => {
-  selectedAgendaKey.value   = day + '/' + monthNum;
-  selectedAgendaLabel.value = day + ' ' + BULAN_ID[monthNum - 1] + ' ' + year;
-  showAgendaModal.value = true;
-  document.body.style.overflow = 'hidden';
-};
-const closeAgendaModal = () => {
-  showAgendaModal.value = false;
-  document.body.style.overflow = '';
-};
-
-
     const agendaCalendars = computed(() => {
-  const isGanjil    = selectedSemester.value === 'GANJIL';
-  const year        = isGanjil ? 2026 : 2027;
-  const monthsRange = isGanjil ? [6,7,8,9,10,11] : [0,1,2,3,4,5];
+      const isGanjil = selectedSemester.value === 'GANJIL';
+      // Ganjil: Juli - Desember 2026 (bulan index 6-11)
+      // Genap : Januari - Juni 2027 (bulan index 0-5)
+      const year        = isGanjil ? 2026 : 2027;
+      const monthsRange = isGanjil ? [6,7,8,9,10,11] : [0,1,2,3,4,5];
 
-  return monthsRange.map(m => ({
-    label: BULAN_ID[m],
-    year,
-    monthNum: m + 1,          // ← baris baru
-    weeks: buildMonthCalendar(year, m)
-  }));
-});
+      return monthsRange.map(m => ({
+        label: BULAN_ID[m],
+        year,
+        monthNum: m + 1,
+        weeks: buildMonthCalendar(year, m)
+      }));
+    });
+
+    // ── PARSER AGENDA (kalender.js) ──
+    const AGENDA_SEP_ENTRY = '🫏';
+    const AGENDA_SEP_FIELD = '☯️';
+
+    const splitLimit = (str, sep, limit) => {
+      const parts = str.split(sep);
+      if (parts.length <= limit) return parts;
+      const head = parts.slice(0, limit - 1);
+      const tail = parts.slice(limit - 1).join(sep);
+      return [...head, tail];
+    };
+
+    const parseAgendaCell = (raw) => {
+      if (!raw || !raw.trim()) return [];
+      return raw.split(AGENDA_SEP_ENTRY).filter(s => s.trim()).map(entry => {
+        const f = splitLimit(entry.trim(), AGENDA_SEP_FIELD, 5);
+        return {
+          mapel:   (f[0] || '-').trim(),
+          tanggal: (f[1] || '').trim(),
+          materi:  (f[2] || '').trim(),
+          tugas:   (f[3] || '').trim(),
+          catatan: (f[4] || '').trim(),
+        };
+      });
+    };
+
+    // { "10/7": [ {mapel, tanggal, materi, tugas, catatan}, ... ] }
+    const agendaByDate = computed(() => {
+      const map   = {};
+      const raw   = window.KALENDER_DATA;
+      const kelas = (studentData.value.kelas || '').trim();
+      if (!raw || !kelas) return map;
+
+      const row = raw.find(r => (r[0] || '').trim() === kelas);
+      if (!row) return map;
+
+      for (let i = 1; i < row.length; i++) {
+        const cell = row[i];
+        if (!cell) continue;
+        parseAgendaCell(cell).forEach(item => {
+          if (!item.tanggal) return;
+          if (!map[item.tanggal]) map[item.tanggal] = [];
+          map[item.tanggal].push(item);
+        });
+      }
+      return map;
+    });
+
+    const hasAgenda = (day, monthNum) => {
+      const key = day + '/' + monthNum;
+      return !!(agendaByDate.value[key] && agendaByDate.value[key].length);
+    };
+
+    const getAgendaCount = (day, monthNum) => {
+      const key = day + '/' + monthNum;
+      return (agendaByDate.value[key] || []).length;
+    };
+
+    const showAgendaModal     = ref(false);
+    const selectedAgendaKey   = ref('');
+    const selectedAgendaLabel = ref('');
+    const selectedAgendaIndex = ref(0);
+
+    const selectedAgendaItems = computed(() => agendaByDate.value[selectedAgendaKey.value] || []);
+    const currentAgendaItem   = computed(() => selectedAgendaItems.value[selectedAgendaIndex.value] || null);
+
+    const openAgendaDetail = (day, monthNum, year) => {
+      selectedAgendaKey.value   = day + '/' + monthNum;
+      selectedAgendaLabel.value = day + ' ' + BULAN_ID[monthNum - 1] + ' ' + year;
+      selectedAgendaIndex.value = 0;
+      showAgendaModal.value = true;
+      document.body.style.overflow = 'hidden';
+    };
+    const closeAgendaModal = () => {
+      showAgendaModal.value = false;
+      document.body.style.overflow = '';
+    };
+    const agendaPrev = () => {
+      if (selectedAgendaIndex.value > 0) selectedAgendaIndex.value--;
+    };
+    const agendaNext = () => {
+      if (selectedAgendaIndex.value < selectedAgendaItems.value.length - 1) selectedAgendaIndex.value++;
+    };
 
     // ── PARSED DATA ──
     const parsedSchedule = computed(() => {
@@ -3459,9 +3569,10 @@ const visibleNotes = computed(() => {
       showPwOld, showPwNew, showPwConfirm,
       doChangePassword, downloadPdf,
       selectedSemester, showGenapOption,
-      weekdayLabels, agendaCalendars,agendaByDate, hasAgenda,
-showAgendaModal, selectedAgendaLabel, selectedAgendaItems,
-openAgendaDetail, closeAgendaModal,
+      weekdayLabels, agendaCalendars,
+      agendaByDate, hasAgenda, getAgendaCount,
+      showAgendaModal, selectedAgendaLabel, selectedAgendaItems, selectedAgendaIndex, currentAgendaItem,
+      openAgendaDetail, closeAgendaModal, agendaPrev, agendaNext,
     };
   }
 }).mount('#app');
