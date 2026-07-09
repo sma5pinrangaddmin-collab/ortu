@@ -2138,8 +2138,32 @@ window._sp5pReady = Promise.all([
             </div>
           </div>
 
-          <div class="agenda-grid">
-            <div v-for="cal in agendaCalendars" :key="cal.label + cal.year" class="agenda-card">
+          <div style="background:white;border-radius:16px;padding:16px 20px;border:1px solid #e5e7eb;box-shadow:0 2px 8px rgba(0,0,0,0.04);margin-bottom:20px;display:flex;flex-wrap:wrap;gap:18px;align-items:center">
+  <div style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px">Keterangan</div>
+
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="width:14px;height:14px;border-radius:4px;background:#fff7ed;border:1.5px solid #ea580c;display:inline-block"></span>
+    <span style="font-size:13px;color:#374151">Ada Agenda Pelajaran</span>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="width:12px;height:12px;border-radius:50%;background:#dc2626;display:inline-block"></span>
+    <span style="font-size:13px;color:#374151">Minggu / Hari Libur</span>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="width:12px;height:12px;border-radius:50%;background:#2563eb;display:inline-block"></span>
+    <span style="font-size:13px;color:#374151">Tidak Libur (Kegiatan Sekolah)</span>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="width:14px;height:14px;border-radius:4px;background:#d1d5db;opacity:0.6;display:inline-block"></span>
+    <span style="font-size:13px;color:#9ca3af">Tanggal Sudah Lewat</span>
+  </div>
+</div>
+
+<div class="agenda-grid">
+  <div v-for="cal in agendaCalendars" :key="cal.label + cal.year" class="agenda-card">
               <div class="agenda-card-title">{{ cal.label }} {{ cal.year }}</div>
               <div class="agenda-weekdays">
                 <span v-for="(wd, wi) in weekdayLabels" :key="wi" :class="{ 'wd-sunday': wi === 0 }">{{ wd }}</span>
@@ -2152,7 +2176,8 @@ window._sp5pReady = Promise.all([
     'agenda-day-sunday': cell.isSunday && cell.day,
     'agenda-day-has-event': cell.day && hasAgenda(cell.day, cal.monthNum),
     'agenda-day-libur': cell.day && getAkademikStatus(cell.day, cal.monthNum) === 'L',
-    'agenda-day-tidaklibur': cell.day && getAkademikStatus(cell.day, cal.monthNum) === 'TL'
+    'agenda-day-tidaklibur': cell.day && getAkademikStatus(cell.day, cal.monthNum) === 'TL',
+    'agenda-day-past': cell.day && isPastDate(cell.day, cal.monthNum, cal.year)
   }"
   @click="cell.day && openAgendaDetail(cell.day, cal.monthNum, cal.year)">
                   <span>{{ cell.day || '•' }}</span>
@@ -3315,6 +3340,14 @@ const getAkademikStatus = (day, monthNum) => {
   return item ? item.status : null;
 };
 
+const isPastDate = (day, monthNum, year) => {
+  const cellDate = new Date(year, monthNum - 1, day);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  cellDate.setHours(0, 0, 0, 0);
+  return cellDate < today;
+};
+
 const akademikInfoForSelected = computed(() => {
   return akademikByDate.value[selectedAgendaKey.value] || null;
 });
@@ -3713,7 +3746,7 @@ const visibleNotes = computed(() => {
       weekdayLabels, agendaCalendars,
       agendaByDate, hasAgenda, getAgendaCount,
       showAgendaModal, selectedAgendaLabel, selectedAgendaItems, selectedAgendaIndex, currentAgendaItem,
-      openAgendaDetail, closeAgendaModal, agendaPrev, agendaNext,akademikByDate, getAkademikStatus, akademikInfoForSelected,
+      openAgendaDetail, closeAgendaModal, agendaPrev, agendaNext,akademikByDate, getAkademikStatus, akademikInfoForSelected,isPastDate,
     };
   }
 }).mount('#app');
@@ -3722,6 +3755,8 @@ const visibleNotes = computed(() => {
 
   .agenda-day-libur      { color: #dc2626 !important; font-weight: 800; }
 .agenda-day-tidaklibur { color: #2563eb !important; font-weight: 800; }
+.agenda-day-past { opacity: 0.4; }
+.agenda-day-past.agenda-day-has-event { opacity: 0.6; }
 
 .bg-green  { background:#ecfdf5!important; color:#059669!important; border-radius:8px; }
 .bg-purple { background:#f5f3ff!important; color:#7c3aed!important; border-radius:8px; }
