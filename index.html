@@ -2138,33 +2138,24 @@ window._sp5pReady = Promise.all([
             </div>
           </div>
 
-          <div style="background:white;border-radius:16px;padding:16px 20px;border:1px solid #e5e7eb;box-shadow:0 2px 8px rgba(0,0,0,0.04);margin-bottom:20px;display:flex;flex-wrap:wrap;gap:18px;align-items:center">
-  <div style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px">Keterangan</div>
-
-  <div style="display:flex;align-items:center;gap:8px">
-    <span style="width:14px;height:14px;border-radius:4px;background:#fff7ed;border:1.5px solid #ea580c;display:inline-block"></span>
-    <span style="font-size:13px;color:#374151">Ada Agenda Pelajaran</span>
+          <!-- NAVIGASI BULAN (khusus mobile) -->
+<div class="agenda-mobile-nav">
+  <button class="agenda-nav-btn" @click="agendaMobilePrev" :disabled="agendaMobileIndex === 0" title="Bulan sebelumnya">
+    <i class="fas fa-chevron-left"></i>
+  </button>
+  <div class="agenda-nav-counter">
+    <i class="fas fa-calendar-alt" style="margin-right:6px"></i>
+    {{ agendaCalendars[agendaMobileIndex] ? agendaCalendars[agendaMobileIndex].label + ' ' + agendaCalendars[agendaMobileIndex].year : '' }}
   </div>
-
-  <div style="display:flex;align-items:center;gap:8px">
-    <span style="width:12px;height:12px;border-radius:50%;background:#dc2626;display:inline-block"></span>
-    <span style="font-size:13px;color:#374151">Minggu / Hari Libur</span>
-  </div>
-
-  <div style="display:flex;align-items:center;gap:8px">
-    <span style="width:12px;height:12px;border-radius:50%;background:#2563eb;display:inline-block"></span>
-    <span style="font-size:13px;color:#374151">Tidak Libur (Kegiatan Sekolah)</span>
-  </div>
-
-  <div style="display:flex;align-items:center;gap:8px">
-    <span style="width:14px;height:14px;border-radius:4px;background:#d1d5db;opacity:0.6;display:inline-block"></span>
-    <span style="font-size:13px;color:#9ca3af">Tanggal Sudah Lewat</span>
-  </div>
+  <button class="agenda-nav-btn" @click="agendaMobileNext" :disabled="agendaMobileIndex === agendaCalendars.length - 1" title="Bulan selanjutnya">
+    <i class="fas fa-chevron-right"></i>
+  </button>
 </div>
 
 <div class="agenda-grid">
-  <div v-for="cal in agendaCalendars" :key="cal.label + cal.year" class="agenda-card">
-              <div class="agenda-card-title">{{ cal.label }} {{ cal.year }}</div>
+  <div v-for="(cal, calIdx) in agendaCalendars" :key="cal.label + cal.year"
+    class="agenda-card" :class="{ 'agenda-card-active': calIdx === agendaMobileIndex }">
+    <div class="agenda-card-title">{{ cal.label }} {{ cal.year }}</div>
               <div class="agenda-weekdays">
                 <span v-for="(wd, wi) in weekdayLabels" :key="wi" :class="{ 'wd-sunday': wi === 0 }">{{ wd }}</span>
               </div>
@@ -2186,11 +2177,36 @@ window._sp5pReady = Promise.all([
                   </span>
                 </span>
               </div>
-            </div>
           </div>
         </div>
 
-        <!-- SERVER -->
+        <!-- KETERANGAN WARNA (di bawah kalender) -->
+        <div style="background:white;border-radius:16px;padding:16px 20px;border:1px solid #e5e7eb;box-shadow:0 2px 8px rgba(0,0,0,0.04);margin-top:20px;display:flex;flex-wrap:wrap;gap:18px;align-items:center">
+          <div style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:1px">Keterangan</div>
+
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="width:14px;height:14px;border-radius:4px;background:#fff7ed;border:1.5px solid #ea580c;display:inline-block"></span>
+            <span style="font-size:13px;color:#374151">Ada Agenda Pelajaran</span>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="width:12px;height:12px;border-radius:50%;background:#dc2626;display:inline-block"></span>
+            <span style="font-size:13px;color:#374151">Minggu / Hari Libur</span>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="width:12px;height:12px;border-radius:50%;background:#2563eb;display:inline-block"></span>
+            <span style="font-size:13px;color:#374151">Tidak Libur (Kegiatan Sekolah)</span>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="width:14px;height:14px;border-radius:4px;background:#d1d5db;opacity:0.6;display:inline-block"></span>
+            <span style="font-size:13px;color:#9ca3af">Tanggal Sudah Lewat</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SERVER -->
         <div v-if="currentTab === 'server'" class="server-panel">
           <div class="server-section-title">Akun</div>
           <div class="server-menu-card">
@@ -3230,6 +3246,27 @@ const todayLabel = computed(() => {
   }));
 });
 
+const agendaMobileIndex = ref(0);
+
+const _setDefaultAgendaMobileIndex = () => {
+  const now = new Date();
+  const idx = agendaCalendars.value.findIndex(
+    c => c.monthNum === now.getMonth() + 1 && c.year === now.getFullYear()
+  );
+  agendaMobileIndex.value = idx !== -1 ? idx : 0;
+};
+
+// Set ulang bulan aktif setiap kali daftar kalender berubah (mis. ganti semester)
+watch(agendaCalendars, () => { _setDefaultAgendaMobileIndex(); }, { immediate: true });
+
+const agendaMobilePrev = () => {
+  if (agendaMobileIndex.value > 0) agendaMobileIndex.value--;
+};
+const agendaMobileNext = () => {
+  if (agendaMobileIndex.value < agendaCalendars.value.length - 1) agendaMobileIndex.value++;
+};
+
+
 const agendaYearLabel = computed(() => {
   const cals = agendaCalendars.value;
   if (!cals.length) return '';
@@ -3746,12 +3783,46 @@ const visibleNotes = computed(() => {
       weekdayLabels, agendaCalendars,
       agendaByDate, hasAgenda, getAgendaCount,
       showAgendaModal, selectedAgendaLabel, selectedAgendaItems, selectedAgendaIndex, currentAgendaItem,
-      openAgendaDetail, closeAgendaModal, agendaPrev, agendaNext,akademikByDate, getAkademikStatus, akademikInfoForSelected,isPastDate,
+      openAgendaDetail, closeAgendaModal, agendaPrev, agendaNext,akademikByDate, getAkademikStatus, akademikInfoForSelected,isPastDate,agendaMobileIndex, agendaMobilePrev, agendaMobileNext,
     };
   }
 }).mount('#app');
 </script>
 <style>
+
+.agenda-mobile-nav {
+  display: none;
+}
+@media (max-width: 899px) {
+  .agenda-mobile-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+    background: white;
+    border-radius: 16px;
+    padding: 12px 16px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .agenda-grid {
+    grid-template-columns: 1fr;
+  }
+  .agenda-card {
+    display: none;
+  }
+  .agenda-card.agenda-card-active {
+    display: block;
+    animation: fadeSlideUp 0.25s ease;
+  }
+}
+
+
+
+
+
+
 
   .agenda-day-libur      { color: #dc2626 !important; font-weight: 800; }
 .agenda-day-tidaklibur { color: #2563eb !important; font-weight: 800; }
