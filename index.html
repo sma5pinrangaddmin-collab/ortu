@@ -13,7 +13,7 @@
 
 const _SP5P_KEY = "sp5p_enc_2025_sman5pinrang_secure!";
 
-// Bangun keystream SHA-256 counter mode (identik dengan Apps Script)
+
 async function _sp5p_keystream(ptLen) {
   const keyHash  = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(_SP5P_KEY));
   const keyBytes = new Uint8Array(keyHash);
@@ -28,8 +28,7 @@ async function _sp5p_keystream(ptLen) {
   return ks;
 }
 
-// Dekripsi base64 → plaintext string
-// Format binary: IV(12) | Tag(16) | CT(n)
+
 async function _sp5p_dec(b64) {
   try {
     const raw   = atob(b64);
@@ -42,10 +41,10 @@ async function _sp5p_dec(b64) {
   } catch(e) { return null; }
 }
 
-// Fetch datasiswa.js fresh setiap kali (no-cache) → decrypt → set SISWA_DATA
+
 const _sp5p_loadData = async () => {
   try {
-    const res = await fetch("datasiswa.js?v=" + Date.now(), {
+    const res = await fetch("ds.js?v=" + Date.now(), {
       cache:   "no-store",
       headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
     });
@@ -66,7 +65,7 @@ const _sp5p_loadData = async () => {
       const fn = new Function(js + "; return window.SISWA_DATA;");
       window.SISWA_DATA = fn();
     } else {
-      throw new Error("Format datasiswa.js tidak dikenal.");
+      throw new Error("telolet");
     }
 
     // Bersihkan raw ciphertext dari window
@@ -78,7 +77,7 @@ const _sp5p_loadData = async () => {
   }
 };
 
-// Anti-DevTools: hapus SISWA_DATA jika DevTools terbuka
+
 (function() {
   const _clear = () => {
     try { delete window.SISWA_DATA;    } catch(e) { window.SISWA_DATA    = null;      }
@@ -130,7 +129,6 @@ const _sp5p_loadConfig = async () => {
   } catch(e) { window.GITHUB_CONFIG = {}; }
 };
 
-// ── Fetch kalenderganjil.js / kalendergenap.js (no-cache) → window.KALENDER_DATA ──
 const _sp5p_loadKalender = async (semester) => {
   try {
     const fileName = (semester === 'GENAP') ? 'kalendergenap.js' : 'kalenderganjil.js';
@@ -146,16 +144,16 @@ const _sp5p_loadKalender = async (semester) => {
     window.KALENDER_DATA = null;
   }
 };
-// Expose ke window agar bisa dipanggil ulang dari dalam Vue app (login/reset)
+
 window._sp5p_loadData     = _sp5p_loadData;
 window._sp5p_loadConfig   = _sp5p_loadConfig;
 window._sp5p_loadKalender = _sp5p_loadKalender;
 
-// Tentukan semester default (sama logikanya dengan yang dipakai di Vue setup)
+
 const _sp5p_defaultSemesterMonth = new Date().getMonth() + 1;
 const _sp5p_defaultSemester = (_sp5p_defaultSemesterMonth >= 1 && _sp5p_defaultSemesterMonth <= 6) ? 'GENAP' : 'GANJIL';
 
-// Mulai load datasiswa.js + config.js + kalenderganjil/genap.js secara paralel
+
 window._sp5pReady = Promise.all([
   _sp5p_loadData(),
   _sp5p_loadConfig(),
@@ -241,7 +239,7 @@ window._sp5pReady = Promise.all([
     100%{transform:scaleX(1);}
   }
 
-  /* ─── LOGIN PAGE ─── */
+ 
   .login-page {
     min-height: 100vh;
     display: flex;
@@ -2984,26 +2982,20 @@ watch(selectedSemester, async (newSem) => {
     const downloadPdf = () => {
       const d = studentData.value;
 
-      const getAssessmentDetailForMapel = (mapelName) => {
+        const getAssessmentDetailForMapel = (mapelName) => {
         const idx = parsedAssessment.value.findIndex(a => a.mapel === mapelName);
         if (idx === -1) return [];
         const raw = d.nlList ? d.nlList[idx] : '';
         if (!raw) return [];
-        const parts = raw.split(',').map(s => s.trim());
+        const parts      = raw.split(',').map(s => s.trim());
         if (parts.length < 2) return [];
-        const tugasList = parts[0].split('@').filter(s => s);
-        const nilaiList = parts[1].split('@').filter(s => s);
-        const len = Math.max(tugasList.length, nilaiList.length);
-        const ambang = parseFloat(d.nilaiAmbang) || 0;
-        return Array.from({ length: len }, (_, i) => {
-          const nilaiStr = tugasList[i] || '';
-          const patokan  = nilaiList[i] !== undefined ? (parseFloat(nilaiList[i]) || 0) : (parseFloat(nilaiStr) || 0);
-          let keterangan;
-          if (isNaN(patokan) || patokan === 0 || nilaiStr === '') keterangan = 'Belum Dinilai';
-          else if (patokan <= ambang) keterangan = 'Perlu Perbaikan';
-          else keterangan = 'Sudah Dinilai';
-          return { nilai: nilaiStr, keterangan };
-        });
+        const tugasList  = parts[0].split('@').filter(s => s);
+        const statusList = parts[1].split('@').filter(s => s);
+        const len = Math.max(tugasList.length, statusList.length);
+        return Array.from({ length: len }, (_, i) => ({
+          nilai:      tugasList[i] || '',
+          keterangan: getNilaiKeterangan(statusList[i])
+        }));
       };
 
       const mapelSet = new Set();
@@ -3471,24 +3463,21 @@ const akademikInfoForSelected = computed(() => {
         return { mapel:parts[0]||'Mata Pelajaran', guru:parts[1]||'Guru', h,ht,i,s,a,b, percentage:pct };
       });
     });
-
+const NILAI_STATUS_MAP = { 'T': 'Sudah Dinilai', 'R': 'Perlu Perbaikan' };
+const getNilaiKeterangan = (kode) => NILAI_STATUS_MAP[(kode || '').trim().toUpperCase()] || 'Belum Dinilai';
     const parsedAssessment = computed(() => {
       if (!studentData.value.rawAssessmentData) return [];
-      const ambang = parseFloat(studentData.value.nilaiAmbang) || 0;
       return studentData.value.rawAssessmentData.split('#').filter(i => i.trim()).map((entry, idx) => {
         const parts = entry.split('@');
         const raw   = studentData.value.nlList?.[idx] || '';
         let remaining = 0;
         if (raw) {
-          const nlParts   = raw.split(',').map(s => s.trim());
-          const tugasList = (nlParts[0] || '').split('@').filter(s => s);
-          const nilaiList = (nlParts[1] || '').split('@').filter(s => s);
-          const len = Math.max(tugasList.length, nilaiList.length);
+          const nlParts    = raw.split(',').map(s => s.trim());
+          const tugasList  = (nlParts[0] || '').split('@').filter(s => s);
+          const statusList = (nlParts[1] || '').split('@').filter(s => s);
+          const len = Math.max(tugasList.length, statusList.length);
           for (let i = 0; i < len; i++) {
-            const nilaiStr = tugasList[i] || '';
-            const patokan  = nilaiList[i] !== undefined ? (parseFloat(nilaiList[i]) || 0) : (parseFloat(nilaiStr) || 0);
-            if (isNaN(patokan) || patokan === 0 || nilaiStr === '') remaining++;
-            else if (patokan <= ambang) remaining++;
+            if (getNilaiKeterangan(statusList[i]) !== 'Sudah Dinilai') remaining++;
           }
         }
         return { mapel: parts[0] || 'Mata Pelajaran', guru: parts[1] || 'Guru', remaining };
@@ -3727,21 +3716,15 @@ const visibleNotes = computed(() => {
       if (selectedAssessmentIndex.value === null) return [];
       const raw = studentData.value.nlList?.[selectedAssessmentIndex.value];
       if (!raw) return [];
-      const parts     = raw.split(',').map(s => s.trim());
+      const parts      = raw.split(',').map(s => s.trim());
       if (parts.length < 2) return [];
-      const tugasList = parts[0].split('@').filter(s=>s);
-      const nilaiList = parts[1].split('@').filter(s=>s);
-      const len       = Math.max(tugasList.length, nilaiList.length);
-      const ambang    = parseFloat(studentData.value.nilaiAmbang) || 0;
-      return Array.from({length:len}, (_,i) => {
-        const nilaiStr  = tugasList[i]||'';
-        const patokan   = nilaiList[i] !== undefined ? (parseFloat(nilaiList[i])||0) : (parseFloat(nilaiStr)||0);
-        let keterangan;
-        if (isNaN(patokan)||patokan===0||nilaiStr==='') keterangan='Belum Dinilai';
-        else if (patokan <= ambang) keterangan='Perlu Perbaikan';
-        else keterangan='Sudah Dinilai';
-        return { nilai:nilaiStr, keterangan };
-      });
+      const tugasList  = parts[0].split('@').filter(s=>s);
+      const statusList = parts[1].split('@').filter(s=>s);
+      const len        = Math.max(tugasList.length, statusList.length);
+      return Array.from({length:len}, (_,i) => ({
+        nilai:      tugasList[i] || '',
+        keterangan: getNilaiKeterangan(statusList[i])
+      }));
     });
 
     const getStatusBadgeClass = (code) => {
