@@ -45,9 +45,8 @@ async function _sp5p_dec(b64) {
 const _sp5p_loadData = async () => {
   try {
     const res = await fetch("ds.js?v=" + Date.now(), {
-      cache:   "no-store",
-      headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
-    });
+  cache: "no-store"
+});
     if (!res.ok) throw new Error("HTTP " + res.status);
     const js = await res.text();
     const marker = 'window.__SP5P="';
@@ -110,9 +109,8 @@ const _sp5p_loadData = async () => {
 const _sp5p_loadConfig = async () => {
   try {
     const res = await fetch("config.js?v=" + Date.now(), {
-      cache:   "no-store",
-      headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
-    });
+  cache: "no-store"
+});
     if (!res.ok) return;
     const js = await res.text();
     const marker = 'window.__CFG="';
@@ -133,9 +131,8 @@ const _sp5p_loadKalender = async (semester) => {
   try {
     const fileName = (semester === 'GENAP') ? 'kalendergenap.js' : 'kalenderganjil.js';
     const res = await fetch(fileName + "?v=" + Date.now(), {
-      cache:   "no-store",
-      headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
-    });
+  cache: "no-store"
+});
     if (!res.ok) { window.KALENDER_DATA = null; return; }
     const js = await res.text();
     const fn = new Function(js + "; return (typeof kalender !== 'undefined') ? kalender : null;");
@@ -2591,9 +2588,8 @@ async function loadLogo() {
 
   try {
     const resp = await fetch(LOGO_URL + (LOGO_URL.includes('?') ? '&' : '?') + 'v=' + Date.now(), {
-      cache: 'no-store',
-      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
-    });
+  cache: 'no-store'
+});
     if (!resp.ok) return cachedData || LOGO_URL;
     const blob = await resp.blob();
     return new Promise((resolve) => {
